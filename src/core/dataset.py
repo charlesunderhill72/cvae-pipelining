@@ -43,11 +43,22 @@ class XBatcherPyTorchDataset(TorchDataset):
         # load before stacking
         batch = self.bgen[idx].load()
 
+        # Print coordinate ranges
+        print("Latitudes:", batch.latitude.values)
+        print("Longitudes:", batch.longitude.values)
+        print("Time:", batch.time.values)
+
+        # get min/max
+        print("Lat range:", batch.latitude.values.min(), "to", batch.latitude.values.max())
+        print("Lon range:", batch.longitude.values.min(), "to", batch.longitude.values.max())
+
         # Use to_stacked_array to stack without broadcasting,
         stacked = batch.to_stacked_array(
-            new_dim="batch", sample_dims=("time", "longitude", "latitude")
+            new_dim="batch", sample_dims=("time", "level", "longitude", "latitude")
         ).transpose("time", "batch", ...)
         x = torch.tensor(stacked.data)
+        print("test")
+        print(x.shape)
         t1 = time.time()
         print_json(
             {
@@ -60,3 +71,126 @@ class XBatcherPyTorchDataset(TorchDataset):
         )
         return x
     
+
+def setup(source="gcs", patch_size: int = 32, input_steps: int = 3):
+    if source == "gcs":
+        ds = xr.open_dataset(
+            "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
+            engine="zarr",
+            chunks={},
+        )
+    elif source == "arraylake":
+        config.set({"s3.endpoint_url": "https://storage.googleapis.com", "s3.anon": True})
+        ds = (
+            Client()
+            .get_repo("earthmover-public/weatherbench2")
+            .to_xarray(
+                group="datasets/era5/1959-2022-6h-128x64_equiangular_with_poles_conservative",
+                chunks={},
+            )
+        )
+    else:
+        raise ValueError(f"Unknown source {source}")
+
+    DEFAULT_VARS = [
+        "geopotential"
+    ]
+
+    ds = ds[DEFAULT_VARS].sel(level=[50, 500])
+    patch = dict(
+        level=2,
+        latitude=32,
+        longitude=16,
+        time=input_steps,
+    )
+    overlap = dict(level=0, latitude=0, longitude=0, time=input_steps // 3 * 2) # Overlap in time dimension to capture temporal correlations
+
+    bgen = xbatcher.BatchGenerator(
+        ds,
+        input_dims=patch,
+        input_overlap=overlap,
+        preload_batch=False,
+    )
+
+    dataset = XBatcherPyTorchDataset(bgen)
+
+    return dataset
+# I should modify this to split into a train and test dataset
+
+def main(
+    source: Annotated[str, typer.Option()] = "gcs",
+    num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2,
+    num_batches: Annotated[int, typer.Option(min=0, max=1000)] = 3,
+    batch_size: Annotated[int, typer.Option(min=0, max=1000)] = 16,
+    shuffle: Annotated[Optional[bool], typer.Option()] = None,
+    num_workers: Annotated[Optional[int], typer.Option(min=0, max=64)] = None,
+    prefetch_factor: Annotated[Optional[int], typer.Option(min=0, max=64)] = None,
+    persistent_workers: Annotated[Optional[bool], typer.Option()] = None,
+    pin_memory: Annotated[Optional[bool], typer.Option()] = None,
+    train_step_time: Annotated[Optional[float], typer.Option()] = 0.1,
+    dask_threads: Annotated[Optional[int], typer.Option()] = None,
+):
+    _locals = {k: v for k, v in locals().items() if not k.startswith("_")}
+    data_params = {
+        "batch_size": batch_size,
+    }
+    if shuffle is not None:
+        data_params["shuffle"] = shuffle
+    if num_workers is not None:
+        data_params["num_workers"] = num_workers
+        data_params["multiprocessing_context"] = "forkserver"
+    if prefetch_factor is not None:
+        data_params["prefetch_factor"] = prefetch_factor
+    if persistent_workers is not None:
+        data_params["persistent_workers"] = persistent_workers
+    if pin_memory is not None:
+        data_params["pin_memory"] = pin_memory
+    if dask_threads is None or dask_threads <= 1:
+        dask.config.set(scheduler="single-threaded")
+    else:
+        dask.config.set(scheduler="threads", num_workers=dask_threads)
+
+    run_start_time = time.time()
+    print_json(
+        {
+            "event": "run start",
+            "time": run_start_time,
+            "data_params": str(data_params),
+            "locals": _locals,
+        }
+    )
+
+    t0 = time.time()
+    print_json({"event": "setup start", "time": t0})
+    dataset = setup(source=source)
+    training_generator = DataLoader(dataset, **data_params)
+    _ = next(iter(training_generator))  # wait until dataloader is ready
+    t1 = time.time()
+    print_json({"event": "setup end", "time": t1, "duration": t1 - t0})
+
+    for epoch in range(num_epochs):
+        e0 = time.time()
+        print_json({"event": "epoch start", "epoch": epoch, "time": e0})
+
+        for i, sample in enumerate(training_generator):
+            tt0 = time.time()
+            print(torch.mean(torch.mean(sample, dim=2)))
+            print_json({"event": "training start", "batch": i, "time": tt0})
+            time.sleep(train_step_time)  # simulate model training
+            tt1 = time.time()
+            print_json({"event": "training end", "batch": i, "time": tt1, "duration": tt1 - tt0})
+            if i == num_batches - 1:
+                break
+
+        e1 = time.time()
+        print_json({"event": "epoch end", "epoch": epoch, "time": e1, "duration": e1 - e0})
+
+    run_finish_time = time.time()
+    print_json(
+        {"event": "run end", "time": run_finish_time, "duration": run_finish_time - run_start_time}
+    )
+
+
+
+if __name__ == '__main__':
+    typer.run(main)

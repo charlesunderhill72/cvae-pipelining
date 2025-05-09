@@ -8,3 +8,5 @@ torch
 typer
 xarray
 xbatcher
+zarr
+cartopy

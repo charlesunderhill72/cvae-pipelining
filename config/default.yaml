@@ -1,0 +1,25 @@
+plot_params:
+  im_path: "images"
+
+data_params:
+  batch_size: 1
+  shuffle: True
+  num_workers: None
+  prefetch_factor: None
+  persistent_workers: None
+  pin_memory: None
+  dask_threads: None
+
+main_params:
+  source: "gcs"
+  num_epochs: 2
+  num_batches: 3
+  batch_size: 16
+  shuffle: None
+  num_workers: None
+  prefetch_factor: None
+  persistent_workers: None
+  pin_memory: None
+  train_step_time: 0.1
+  dask_threads: None
+
