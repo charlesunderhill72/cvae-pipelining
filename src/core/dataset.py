@@ -1,6 +1,7 @@
 import json
 import time
 from typing import Optional
+import numpy as np
 
 import dask
 import torch
@@ -44,20 +45,20 @@ class XBatcherPyTorchDataset(TorchDataset):
         batch = self.bgen[idx].load()
 
         # Print coordinate ranges
-        print("Latitudes:", batch.latitude.values)
-        print("Longitudes:", batch.longitude.values)
-        print("Time:", batch.time.values)
+        #print("Latitudes:", batch.latitude.values)
+        #print("Longitudes:", batch.longitude.values)
+        #print("Time:", batch.time.values)
 
         # get min/max
-        print("Lat range:", batch.latitude.values.min(), "to", batch.latitude.values.max())
-        print("Lon range:", batch.longitude.values.min(), "to", batch.longitude.values.max())
+        #print("Lat range:", batch.latitude.values.min(), "to", batch.latitude.values.max())
+        #print("Lon range:", batch.longitude.values.min(), "to", batch.longitude.values.max())
 
         # Use to_stacked_array to stack without broadcasting,
         stacked = batch.to_stacked_array(
             new_dim="batch", sample_dims=("time", "level", "longitude", "latitude")
         ).transpose("time", "batch", ...)
         x = torch.tensor(stacked.data)
-        print("test")
+        #print("test")
         print(x.shape)
         t1 = time.time()
         print_json(
@@ -72,23 +73,14 @@ class XBatcherPyTorchDataset(TorchDataset):
         return x
     
 
-def setup(source="gcs", patch_size: int = 32, input_steps: int = 3):
+def setup(source="gcs", split="2019", set="train",  patch_size: int = 32, input_steps: int = 3):
     if source == "gcs":
         ds = xr.open_dataset(
             "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
             engine="zarr",
             chunks={},
         )
-    elif source == "arraylake":
-        config.set({"s3.endpoint_url": "https://storage.googleapis.com", "s3.anon": True})
-        ds = (
-            Client()
-            .get_repo("earthmover-public/weatherbench2")
-            .to_xarray(
-                group="datasets/era5/1959-2022-6h-128x64_equiangular_with_poles_conservative",
-                chunks={},
-            )
-        )
+
     else:
         raise ValueError(f"Unknown source {source}")
 
@@ -96,14 +88,27 @@ def setup(source="gcs", patch_size: int = 32, input_steps: int = 3):
         "geopotential"
     ]
 
-    ds = ds[DEFAULT_VARS].sel(level=[50, 500])
+    start_time = np.datetime64('1959-01-01T00:00:00')
+    train_split_time = np.datetime64(f'{int(split)-1}-12-31T18:00:00')
+    test_split_time = np.datetime64(f'{split}-01-01T00:00:00')
+    end_time = np.datetime64('2023-01-10T18:00:00')
+
+    if set == "train":
+        ds = ds[DEFAULT_VARS].sel(time=slice(start_time, train_split_time), level=[50, 500])
+
+    elif set == "test":
+        ds = ds[DEFAULT_VARS].sel(time=slice(test_split_time, end_time), level=[50, 500])
+
+    else:
+        raise ValueError(f"set parameter must be either train or test, not {set}")
+    
     patch = dict(
         level=2,
+        longitude=64,
         latitude=32,
-        longitude=16,
         time=input_steps,
     )
-    overlap = dict(level=0, latitude=0, longitude=0, time=input_steps // 3 * 2) # Overlap in time dimension to capture temporal correlations
+    overlap = dict(level=0, longitude=0, latitude=0, time=input_steps // 3 * 2) # Overlap in time dimension to capture temporal correlations
 
     bgen = xbatcher.BatchGenerator(
         ds,
@@ -111,11 +116,39 @@ def setup(source="gcs", patch_size: int = 32, input_steps: int = 3):
         input_overlap=overlap,
         preload_batch=False,
     )
+    #print(ds)
 
     dataset = XBatcherPyTorchDataset(bgen)
 
     return dataset
-# I should modify this to split into a train and test dataset
+
+
+def set_data_params(config):
+    """Read data params in from YAML config file."""
+    params = config.get("data_params", {})
+    data_params = {
+        "batch_size": params.get("batch_size", 16),  # default fallback
+    }
+
+    if params.get("shuffle") is not None:
+        data_params["shuffle"] = params["shuffle"]
+    if params.get("num_workers") is not None:
+        data_params["num_workers"] = params["num_workers"]
+        data_params["multiprocessing_context"] = "forkserver"
+    if params.get("prefetch_factor") is not None:
+        data_params["prefetch_factor"] = params["prefetch_factor"]
+    if params.get("persistent_workers") is not None:
+        data_params["persistent_workers"] = params["persistent_workers"]
+    if params.get("pin_memory") is not None:
+        data_params["pin_memory"] = params["pin_memory"]
+
+    dask_threads = params.get("dask_threads")
+    if dask_threads is None or dask_threads <= 1:
+        dask.config.set(scheduler="single-threaded")
+    else:
+        dask.config.set(scheduler="threads", num_workers=dask_threads)
+
+    return data_params
 
 def main(
     source: Annotated[str, typer.Option()] = "gcs",
@@ -163,6 +196,7 @@ def main(
     t0 = time.time()
     print_json({"event": "setup start", "time": t0})
     dataset = setup(source=source)
+    print("Dataset Length:", len(dataset))
     training_generator = DataLoader(dataset, **data_params)
     _ = next(iter(training_generator))  # wait until dataloader is ready
     t1 = time.time()
