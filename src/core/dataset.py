@@ -27,6 +27,8 @@ def print_json(obj):
 class XBatcherPyTorchDataset(TorchDataset):
     def __init__(self, batch_generator: xbatcher.BatchGenerator):
         self.bgen = batch_generator
+        self.lons = None
+        self.lats = None
 
     def __len__(self):
         return len(self.bgen)
@@ -43,6 +45,8 @@ class XBatcherPyTorchDataset(TorchDataset):
         )
         # load before stacking
         batch = self.bgen[idx].load()
+        self.lons = batch.longitude.values
+        self.lats = batch.latitude.values
 
         # Print coordinate ranges
         #print("Latitudes:", batch.latitude.values)

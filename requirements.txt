@@ -10,3 +10,4 @@ xarray
 xbatcher
 zarr
 cartopy
+tqdm

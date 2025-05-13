@@ -4,11 +4,13 @@ import os
 import json
 import yaml
 import dask
+import torch
 import numpy as np
 import xarray as xr
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from src.core.dataset import XBatcherPyTorchDataset, setup
+from src.core.dataset import setup
+from src.tasks.plot import plot_tensor_batch
 
 def compute_global_min_max(dataloader: DataLoader, num_channels=2) -> dict:
     r"""
@@ -31,45 +33,21 @@ def compute_global_min_max(dataloader: DataLoader, num_channels=2) -> dict:
 
     return global_min_max
 
-def compute_global_max(dataloader: DataLoader, num_channels=2) -> list[float]:
-    r"""
-    Iterates over image attributes from Dataset class and returns global max.
-    """
-    global_max = [float('-inf'), float('-inf')]
-
-    for i, sample in tqdm(enumerate(dataloader), desc="Computing global max"):
-       for j in range(num_channels):
-          current_max = sample[:, :, :, j, :, :].max()
-          global_max[j] = max(global_max[j], current_max)
-    
-    return global_max
-
-
-def corrupt_data(data, k):
+def corrupt_data(tensor, k):
   """Gives corrupted data for either one timestep or for a full year dataset
      depending on the input. k is the percent of corrupted data points.
      Expects a numpy array for the data input."""
-  data_c = np.copy(data)
-  m, n = 91, 180
+  tensor_c = tensor.detach().clone()
+  m, n = int(tensor_c.shape[-2]), int(tensor_c.shape[-1])
+
   indices = np.random.choice(m*n, size=int(k*m*n), replace=False)
 
   # Convert the indices into row and column indices in the 2D meshgrid
-  lat_indices, lon_indices = np.unravel_index(indices, (m, n))
+  lon_indices, lat_indices = np.unravel_index(indices, (m, n))
 
-  # Set the randomly selected points to 0
-  if (np.size(data_c.shape) == 3):
-    for i in range(2):
-      data_c[i][lat_indices, lon_indices] = 0
-
-  elif (np.size(data_c.shape) == 4):
-    for i in range(data_c.shape[0]):
-      for j in range(2):
-        indices = np.random.choice(m*n, size=int(k*m*n), replace=False)
-        # Convert the indices into row and column indices in the 2D meshgrid
-        lat_indices, lon_indices = np.unravel_index(indices, (m, n))
-        data_c[i][j][lat_indices, lon_indices] = 0
-
-  return data_c
+  for lon_idx, lat_idx in zip(lon_indices, lat_indices):
+    tensor_c[:, :, :, :, lon_idx, lat_idx] = 0
+  return tensor_c
 
 
 def set_data_params(config):
@@ -125,6 +103,25 @@ def main():
 
     print("Global_min:", min_max_dict["global_min"])
     print("Global_max:", min_max_dict["global_max"])
+
+    sample = next(iter(training_generator))
+    sample_c = corrupt_data(sample, 0.3)
+
+    print(sample_c.shape)
+
+    lons = dataset.lons
+    lats = dataset.lats
+
+    #plot_tensor_batch(sample_c, lons, lats, prefix="corrupted_data")
+
+    # Min-max scaling
+    # Convert min/max lists to tensors and reshape for broadcasting
+    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1)
+    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1)
+    sample_norm = (sample - global_min) / (global_max - global_min)
+    sample_c_norm = (sample_c) / (global_max)
+
+    plot_tensor_batch(sample_c_norm, lons, lats, prefix="scaled_c_data")
 
 
 
