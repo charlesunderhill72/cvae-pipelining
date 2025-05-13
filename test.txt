@@ -1,0 +1,47 @@
+{"event": "run start", "time": 1746828478.119234, "data_params": "{'batch_size': 1, 'shuffle': True}", "locals": {"source": "gcs", "num_epochs": 1, "num_batches": 1, "batch_size": 1, "shuffle": true, "num_workers": null, "prefetch_factor": null, "persistent_workers": null, "pin_memory": null, "train_step_time": 0.1, "dask_threads": null}}
+{"event": "setup start", "time": 1746828478.1192608}
+<xarray.Dataset> Size: 1GB
+Dimensions:       (time: 87660, level: 2, longitude: 64, latitude: 32)
+Coordinates:
+  * latitude      (latitude) float64 256B -87.19 -81.56 -75.94 ... 81.56 87.19
+  * level         (level) int64 16B 50 500
+  * longitude     (longitude) float64 512B 0.0 5.625 11.25 ... 343.1 348.8 354.4
+  * time          (time) datetime64[ns] 701kB 1959-01-01 ... 2018-12-31T18:00:00
+Data variables:
+    geopotential  (time, level, longitude, latitude) float32 1GB dask.array<chunksize=(100, 2, 64, 32), meta=np.ndarray>
+Dataset Length: 350632
+{"event": "get-batch start", "time": 1746828506.3749588, "idx": 94238, "pid": 48918}
+Latitudes: [ 2.8125  8.4375 14.0625 19.6875 25.3125 30.9375 36.5625 42.1875 47.8125
+ 53.4375 59.0625 64.6875 70.3125 75.9375 81.5625 87.1875]
+Longitudes: [  0.      5.625  11.25   16.875  22.5    28.125  33.75   39.375  45.
+  50.625  56.25   61.875  67.5    73.125  78.75   84.375  90.     95.625
+ 101.25  106.875 112.5   118.125 123.75  129.375 135.    140.625 146.25
+ 151.875 157.5   163.125 168.75  174.375]
+Time: ['1963-07-04T00:00:00.000000000' '1963-07-04T06:00:00.000000000'
+ '1963-07-04T12:00:00.000000000']
+Lat range: 2.812500000000003 to 87.18750000000003
+Lon range: 0.0 to 174.375
+test
+torch.Size([3, 1, 2, 32, 16])
+{"event": "get-batch end", "time": 1746828507.8263361, "idx": 94238, "pid": 48918, "duration": 1.4513773918151855}
+{"event": "setup end", "time": 1746828507.8294308, "duration": 29.710170030593872}
+{"event": "epoch start", "epoch": 0, "time": 1746828507.8294485}
+{"event": "get-batch start", "time": 1746828507.8424716, "idx": 138443, "pid": 48918}
+Latitudes: [ 2.8125  8.4375 14.0625 19.6875 25.3125 30.9375 36.5625 42.1875 47.8125
+ 53.4375 59.0625 64.6875 70.3125 75.9375 81.5625 87.1875]
+Longitudes: [  0.      5.625  11.25   16.875  22.5    28.125  33.75   39.375  45.
+  50.625  56.25   61.875  67.5    73.125  78.75   84.375  90.     95.625
+ 101.25  106.875 112.5   118.125 123.75  129.375 135.    140.625 146.25
+ 151.875 157.5   163.125 168.75  174.375]
+Time: ['1993-10-05T06:00:00.000000000' '1993-10-05T12:00:00.000000000'
+ '1993-10-05T18:00:00.000000000']
+Lat range: 2.812500000000003 to 87.18750000000003
+Lon range: 0.0 to 174.375
+test
+torch.Size([3, 1, 2, 32, 16])
+{"event": "get-batch end", "time": 1746828508.646632, "idx": 138443, "pid": 48918, "duration": 0.8041603565216064}
+tensor(127865.1016)
+{"event": "training start", "batch": 0, "time": 1746828508.6467788}
+{"event": "training end", "batch": 0, "time": 1746828508.7483845, "duration": 0.10160565376281738}
+{"event": "epoch end", "epoch": 0, "time": 1746828508.758663, "duration": 0.9292144775390625}
+{"event": "run end", "time": 1746828508.7587335, "duration": 30.63949942588806}
