@@ -42,23 +42,41 @@ def plot_batch_from_bgen(batch, save_path="./images/patches.png"):
 
 
 def plot_tensor_batch(tensor, lons, lats, save_dir="./images", prefix="batch_timestep"):
-    batch_size, time_steps, patches, num_levels, _, _ = tensor.shape
+    if tensor.dim() == 4:
+        batch_size, num_levels, _, _ = tensor.shape
 
-    for b in range(batch_size):
-        for t in range(time_steps):
-            fig, axes = plt.subplots(patches, num_levels, figsize=(6*num_levels, 4*patches),
+        for b in range(batch_size):
+            fig, axes = plt.subplots(num_levels, figsize=(6*num_levels, 18),
                                     subplot_kw={'projection': ccrs.PlateCarree()})
-            for p in range(patches):
-                for l in range(num_levels):
-                    ax = axes[p, l] if patches > 1 else axes[l]
-                    ax.set_title(f"Time {t}, Patch {p}, Level {l}")
-                    ax.coastlines()
-                    cf = ax.contourf(lons, lats, tensor[b, t, p, l].numpy().T, 20, cmap="viridis")
-                    plt.colorbar(cf, ax=ax)
+            for l in range(num_levels):
+                ax = axes[l]
+                ax.set_title(f"Batch {b}, Level {l}")
+                ax.coastlines()
+                cf = ax.contourf(lons, lats, tensor[b, l].numpy().T, 20, cmap="viridis")
+                plt.colorbar(cf, ax=ax)
 
             plt.tight_layout()
-            plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}_t{t}.png"))
+            plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}.png"))
             plt.close(fig)
+
+    else:
+        batch_size, time_steps, patches, num_levels, _, _ = tensor.shape
+
+        for b in range(batch_size):
+            for t in range(time_steps):
+                fig, axes = plt.subplots(patches, num_levels, figsize=(6*num_levels, 4*patches),
+                                        subplot_kw={'projection': ccrs.PlateCarree()})
+                for p in range(patches):
+                    for l in range(num_levels):
+                        ax = axes[p, l] if patches > 1 else axes[l]
+                        ax.set_title(f"Time {t}, Patch {p}, Level {l}")
+                        ax.coastlines()
+                        cf = ax.contourf(lons, lats, tensor[b, t, p, l].numpy().T, 20, cmap="viridis")
+                        plt.colorbar(cf, ax=ax)
+
+                plt.tight_layout()
+                plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}_t{t}.png"))
+                plt.close(fig)
 
 def main(input_steps=3):
     ds = xr.open_dataset(

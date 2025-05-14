@@ -15,3 +15,44 @@
    do per batch, and the labels are the uncorrupted inputs. The corruption will be 
    part of the preprocessing stage. 
 """
+"""
+for epoch_idx in range(num_epochs):
+        losses = []
+        for i, sample in tqdm(enumerate(training_generator)):
+            optimizer.zero_grad()
+            im = im.float().to(device)
+            im = pad_to_power_of_2(im)
+
+            recon, mu, log_var = model(im)
+            mse_loss = criterion(recon, im)
+            loss = final_loss(mse_loss, mu, log_var)
+            losses.append(loss.item())
+            loss.backward()
+            optimizer.step()
+
+        print('Finished epoch:{} | Loss : {:.4f}'.format(
+                epoch_idx + 1,
+                np.mean(losses),
+            ))
+
+        torch.save(model.state_dict(), os.path.join(autoencoder_config['task_name'],
+                                                autoencoder_config['ckpt_name']))
+"""
+
+import torch
+
+def final_loss(bce_loss, mu, logvar):
+    """
+    This function will add the reconstruction loss (BCELoss) and the
+    KL-Divergence.
+    KL-Divergence = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+    :param bce_loss: recontruction loss
+    :param mu: the mean from the latent vector
+    :param logvar: log variance from the latent vector
+    """
+    BCE = bce_loss
+    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    return BCE + KLD
+
+def fit(model, sample_in, sample_out, criterion, losses, loss):
+    return

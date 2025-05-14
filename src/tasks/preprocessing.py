@@ -77,6 +77,28 @@ def set_data_params(config):
 
     return data_params
 
+def scale_data(sample, min_max_dict, corrupted=False):
+    # Convert min/max lists to tensors and reshape for broadcasting
+    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1)
+    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1)
+    # If sample is corrupted global_min == 0
+    if corrupted:
+        sample_norm = (sample) / (global_max)
+    else:
+        sample_norm = (sample - global_min) / (global_max - global_min)
+
+    return sample_norm
+
+def reshape_batch(sample):
+    # Original shape: [B, T, P, C, H, W]
+    B, T, P, C, H, W = sample.shape
+
+    # Merge batch, time, and patch into a single batch dimension
+    sample_vae_input = sample.view(B * T * P, C, H, W)
+
+    return sample_vae_input
+
+
 # Change to compute global min and max simultaneously, save computed values, and set to read in saved values if a save file exists
 def main():
     # Read the config file #
@@ -115,13 +137,13 @@ def main():
     #plot_tensor_batch(sample_c, lons, lats, prefix="corrupted_data")
 
     # Min-max scaling
-    # Convert min/max lists to tensors and reshape for broadcasting
-    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1)
-    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1)
-    sample_norm = (sample - global_min) / (global_max - global_min)
-    sample_c_norm = (sample_c) / (global_max)
+    sample_norm = scale_data(sample, min_max_dict)
+    sample_c_norm = scale_data(sample_c, min_max_dict, corrupted=True)
+    #plot_tensor_batch(sample_c_norm, lons, lats, prefix="scaled_c_data")
 
-    plot_tensor_batch(sample_c_norm, lons, lats, prefix="scaled_c_data")
+    sample_reshape = reshape_batch(sample_norm)
+
+    plot_tensor_batch(sample_reshape, lons, lats, prefix="batch")
 
 
 
