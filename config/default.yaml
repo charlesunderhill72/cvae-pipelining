@@ -3,12 +3,12 @@ plot_params:
 
 data_params:
   batch_size: 10
-  shuffle: False
-  num_workers: null
-  prefetch_factor: null
-  persistent_workers: null
+  shuffle: True
+  num_workers: 8
+  prefetch_factor: 3
+  persistent_workers: True
   pin_memory: null
-  dask_threads: null
+  dask_threads: 4
 
 main_params:
   source: "gcs"

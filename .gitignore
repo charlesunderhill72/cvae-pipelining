@@ -14,6 +14,10 @@ __pycache__
 *.csv
 *.json
 
+# Ignore txt files except requirements
+*.txt
+!requirements.txt
+
 # Ignore checkpoints
 *.pth
 

@@ -8,6 +8,11 @@ class ConvVAE(nn.Module):
     A basic convolutional variational autoencoder. 
     Works best with inputs padded to heights and widths 
     that are a power of 2.
+
+    [W, H] Get reduced by a power of 2 in every Conv2D layer. 
+    Latent space needs to be written so that the first linear 
+    layer has input/output shapes of (channels*W*H) where W, H 
+    are given by the last Conv2d layer. 
     """
     def __init__(self, image_channels=2, init_channels=32, kernel_size=3, latent_dim=128):
         super(ConvVAE, self).__init__()
@@ -19,9 +24,9 @@ class ConvVAE(nn.Module):
         self.enc4 = nn.Conv2d(init_channels * 4, 256, kernel_size=kernel_size, stride=2, padding=1)  # Output: [batch, 256, 8, 16]
 
         # Latent space
-        self.fc_mu = nn.Linear(256 * 8 * 16, latent_dim)
-        self.fc_log_var = nn.Linear(256 * 8 * 16, latent_dim)
-        self.fc2 = nn.Linear(latent_dim, 256 * 8 * 16)
+        self.fc_mu = nn.Linear(256 * 4 * 2, latent_dim)
+        self.fc_log_var = nn.Linear(256 * 4 * 2, latent_dim)
+        self.fc2 = nn.Linear(latent_dim, 256 * 4 * 2)
 
         # Decoder
         self.dec1 = nn.ConvTranspose2d(256, init_channels * 4, kernel_size=kernel_size, stride=2, padding=1, output_padding=1)  # Output: [batch, 128, 16, 32]
@@ -52,7 +57,7 @@ class ConvVAE(nn.Module):
 
         # Decoder
         z = self.fc2(z)  # Reshape to match the size after encoding
-        z = z.view(-1, 256, 8, 16)  # Reshape to [batch_size, 256, 8, 16]
+        z = z.view(-1, 256, 4, 2)  # Reshape to [batch_size, 256, 8, 16]
 
         x = F.relu(self.dec1(z))
         x = F.relu(self.dec2(x))

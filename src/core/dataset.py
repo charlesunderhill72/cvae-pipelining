@@ -63,7 +63,7 @@ class XBatcherPyTorchDataset(TorchDataset):
         ).transpose("time", "batch", ...)
         x = torch.tensor(stacked.data)
         #print("test")
-        print(x.shape)
+        #print(x.shape)
         t1 = time.time()
         print_json(
             {
@@ -71,13 +71,13 @@ class XBatcherPyTorchDataset(TorchDataset):
                 "time": t1,
                 "idx": idx,
                 "pid": multiprocessing.current_process().pid,
-                "duration": t1 - t0,
+               "duration": t1 - t0,
             }
         )
         return x
     
 
-def setup(source="gcs", split="2019", set="train",  patch_size: int = 32, input_steps: int = 3):
+def setup(source="gcs", split="2019", set="train",  patch_size: int = 32, input_steps: int = 1):
     if source == "gcs":
         ds = xr.open_dataset(
             "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
@@ -126,7 +126,6 @@ def setup(source="gcs", split="2019", set="train",  patch_size: int = 32, input_
 
     return dataset
 
-
 def set_data_params(config):
     """Read data params in from YAML config file."""
     params = config.get("data_params", {})
@@ -146,7 +145,7 @@ def set_data_params(config):
     if params.get("pin_memory") is not None:
         data_params["pin_memory"] = params["pin_memory"]
 
-    dask_threads = params.get("dask_threads")
+    dask_threads = params["dask_threads"]
     if dask_threads is None or dask_threads <= 1:
         dask.config.set(scheduler="single-threaded")
     else:

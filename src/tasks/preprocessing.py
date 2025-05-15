@@ -9,7 +9,7 @@ import numpy as np
 import xarray as xr
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from src.core.dataset import setup
+from src.core.dataset import setup, set_data_params
 from src.tasks.plot import plot_tensor_batch
 
 def compute_global_min_max(dataloader: DataLoader, num_channels=2) -> dict:
@@ -50,37 +50,10 @@ def corrupt_data(tensor, k):
   return tensor_c
 
 
-def set_data_params(config):
-    """Read data params in from YAML config file."""
-    params = config.get("data_params", {})
-    data_params = {
-        "batch_size": params.get("batch_size", 16),  # default fallback
-    }
-
-    if params.get("shuffle") is not None:
-        data_params["shuffle"] = params["shuffle"]
-    if params.get("num_workers") is not None:
-        data_params["num_workers"] = params["num_workers"]
-        data_params["multiprocessing_context"] = "forkserver"
-    if params.get("prefetch_factor") is not None:
-        data_params["prefetch_factor"] = params["prefetch_factor"]
-    if params.get("persistent_workers") is not None:
-        data_params["persistent_workers"] = params["persistent_workers"]
-    if params.get("pin_memory") is not None:
-        data_params["pin_memory"] = params["pin_memory"]
-
-    dask_threads = params["dask_threads"]
-    if dask_threads is None or dask_threads <= 1:
-        dask.config.set(scheduler="single-threaded")
-    else:
-        dask.config.set(scheduler="threads", num_workers=dask_threads)
-
-    return data_params
-
-def scale_data(sample, min_max_dict, corrupted=False):
+def scale_data(sample, min_max_dict, device, corrupted=False):
     # Convert min/max lists to tensors and reshape for broadcasting
-    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1)
-    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1)
+    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1).to(device)
+    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
     # If sample is corrupted global_min == 0
     if corrupted:
         sample_norm = (sample) / (global_max)
@@ -98,7 +71,7 @@ def reshape_batch(sample):
 
     return sample_vae_input
 
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Change to compute global min and max simultaneously, save computed values, and set to read in saved values if a save file exists
 def main():
     # Read the config file #
@@ -137,8 +110,8 @@ def main():
     #plot_tensor_batch(sample_c, lons, lats, prefix="corrupted_data")
 
     # Min-max scaling
-    sample_norm = scale_data(sample, min_max_dict)
-    sample_c_norm = scale_data(sample_c, min_max_dict, corrupted=True)
+    sample_norm = scale_data(sample, min_max_dict, device)
+    sample_c_norm = scale_data(sample_c, min_max_dict, device, corrupted=True)
     #plot_tensor_batch(sample_c_norm, lons, lats, prefix="scaled_c_data")
 
     sample_reshape = reshape_batch(sample_norm)
