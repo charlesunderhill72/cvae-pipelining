@@ -45,8 +45,8 @@ class XBatcherPyTorchDataset(TorchDataset):
         )
         # load before stacking
         batch = self.bgen[idx].load()
-        self.lons = batch.longitude.values
-        self.lats = batch.latitude.values
+        #self.lons = batch.longitude.values
+        #self.lats = batch.latitude.values
 
         # Print coordinate ranges
         #print("Latitudes:", batch.latitude.values)
@@ -62,6 +62,7 @@ class XBatcherPyTorchDataset(TorchDataset):
             new_dim="batch", sample_dims=("time", "level", "longitude", "latitude")
         ).transpose("time", "batch", ...)
         x = torch.tensor(stacked.data)
+        #print(id(x))
         #print("test")
         #print(x.shape)
         t1 = time.time()
@@ -77,7 +78,7 @@ class XBatcherPyTorchDataset(TorchDataset):
         return x
     
 
-def setup(source="gcs", split="2019", set="train",  patch_size: int = 32, input_steps: int = 1):
+def setup(source="gcs", split="1979", set="train",  patch_size: int = 32, input_steps: int = 1):
     if source == "gcs":
         ds = xr.open_dataset(
             "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",

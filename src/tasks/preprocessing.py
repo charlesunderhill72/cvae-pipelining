@@ -33,27 +33,32 @@ def compute_global_min_max(dataloader: DataLoader, num_channels=2) -> dict:
 
     return global_min_max
 
+
 def corrupt_data(tensor, k):
-  """Gives corrupted data for either one timestep or for a full year dataset
-     depending on the input. k is the percent of corrupted data points.
-     Expects a numpy array for the data input."""
-  tensor_c = tensor.detach().clone()
-  m, n = int(tensor_c.shape[-2]), int(tensor_c.shape[-1])
+    tensor_c = tensor.detach().clone()
+    m, n = int(tensor_c.shape[-2]), int(tensor_c.shape[-1])
+    B, T, P, C = tensor_c.shape[:4]
 
-  indices = np.random.choice(m*n, size=int(k*m*n), replace=False)
+    total_points = m * n
+    num_corrupt = int(k * total_points)
+    
+    # Choose flat indices to corrupt
+    indices = np.random.choice(total_points, size=num_corrupt, replace=False)
+    lon_indices, lat_indices = np.unravel_index(indices, (m, n))
 
-  # Convert the indices into row and column indices in the 2D meshgrid
-  lon_indices, lat_indices = np.unravel_index(indices, (m, n))
+    # Create a corruption mask
+    mask = torch.ones_like(tensor_c)
+    mask[..., lon_indices, lat_indices] = 0
 
-  for lon_idx, lat_idx in zip(lon_indices, lat_indices):
-    tensor_c[:, :, :, :, lon_idx, lat_idx] = 0
-  return tensor_c
+    tensor_c *= mask  # Apply mask
+
+    return tensor_c
 
 
-def scale_data(sample, min_max_dict, device, corrupted=False):
+def scale_data(sample, global_min, global_max, device, corrupted=False):
     # Convert min/max lists to tensors and reshape for broadcasting
-    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1).to(device)
-    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
+    #global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1).to(device)
+    #global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
     # If sample is corrupted global_min == 0
     if corrupted:
         sample_norm = (sample) / (global_max)
@@ -99,8 +104,8 @@ def main():
     print("Global_min:", min_max_dict["global_min"])
     print("Global_max:", min_max_dict["global_max"])
 
-    sample = next(iter(training_generator))
-    sample_c = corrupt_data(sample, 0.3)
+    sample = next(iter(training_generator)).to(device)
+    sample_c = corrupt_data(sample, 0.3).to(device)
 
     print(sample_c.shape)
 
@@ -116,7 +121,7 @@ def main():
 
     sample_reshape = reshape_batch(sample_norm)
 
-    plot_tensor_batch(sample_reshape, lons, lats, prefix="batch")
+    #plot_tensor_batch(sample_reshape, lons, lats, prefix="batch")
 
 
 

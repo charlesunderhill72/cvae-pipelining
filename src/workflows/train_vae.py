@@ -16,9 +16,16 @@ from torch.optim import Adam
 from tqdm import tqdm
 from src.core.models import ConvVAE
 from src.tasks.fit import final_loss
+from dask.cache import Cache
+from memory_profiler import profile
+
+# comment these the next two lines out to disable Dask's cache
+cache = Cache(1e10)  # 10gb cache
+cache.register()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+@profile
 def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2):
     _locals = {k: v for k, v in locals().items() if not k.startswith("_")}
     # Read the config file #
@@ -48,6 +55,9 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
         with open(os.path.join("config", "min_max_dict.json"), "w") as f:
             json.dump(min_max_dict, f)
     
+    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1).to(device)
+    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
+
     # Instantiate the model
     model = ConvVAE().to(device)
     model.train()
@@ -69,13 +79,13 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
 
     for epoch_idx in range(num_epochs):
         for i, sample in tqdm(enumerate(training_generator), total=len(training_generator)):
-            print(sample.shape)
+            #print(sample.shape)
             optimizer.zero_grad()
             sample = sample.float().to(device)
             sample_c = pre.corrupt_data(sample, 0.3).float().to(device)
 
-            sample_norm = pre.scale_data(sample, min_max_dict, device)
-            sample_c_norm = pre.scale_data(sample_c, min_max_dict, device, corrupted=True)
+            sample_norm = pre.scale_data(sample, global_min, global_max, device)
+            sample_c_norm = pre.scale_data(sample_c, global_min, global_max, device, corrupted=True)
 
             sample_reshape = pre.reshape_batch(sample_norm)
             sample_c_reshape = pre.reshape_batch(sample_c_norm)
@@ -83,9 +93,13 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
             recon, mu, log_var = model(sample_c_reshape)
             bce_loss = criterion(recon, sample_reshape)
             loss = final_loss(bce_loss, mu, log_var)
-            losses.append(loss.item())
+            #losses.append(loss.item())
             loss.backward()
             optimizer.step()
+
+            del sample, sample_c, sample_norm, sample_c_norm, sample_reshape, sample_c_reshape, recon, mu, log_var
+            #torch.cuda.empty_cache()
+
 
         losses.append(loss.detach().cpu().numpy())
         print('Finished epoch:{} | Loss : {:.4f}'.format(
