@@ -55,10 +55,8 @@ def corrupt_data(tensor, k):
     return tensor_c
 
 
-def scale_data(sample, global_min, global_max, device, corrupted=False):
+def scale_data(sample, global_min, global_max, corrupted=False):
     # Convert min/max lists to tensors and reshape for broadcasting
-    #global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1).to(device)
-    #global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
     # If sample is corrupted global_min == 0
     if corrupted:
         sample_norm = (sample) / (global_max)
@@ -77,7 +75,7 @@ def reshape_batch(sample):
     return sample_vae_input
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# Change to compute global min and max simultaneously, save computed values, and set to read in saved values if a save file exists
+
 def main():
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
@@ -101,8 +99,11 @@ def main():
         with open(os.path.join("config", "min_max_dict.json"), "w") as f:
             json.dump(min_max_dict, f)
 
-    print("Global_min:", min_max_dict["global_min"])
-    print("Global_max:", min_max_dict["global_max"])
+    global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1).to(device)
+    global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
+
+    print("Global_min:", global_min)
+    print("Global_max:", global_max)
 
     sample = next(iter(training_generator)).to(device)
     sample_c = corrupt_data(sample, 0.3).to(device)
@@ -115,8 +116,8 @@ def main():
     #plot_tensor_batch(sample_c, lons, lats, prefix="corrupted_data")
 
     # Min-max scaling
-    sample_norm = scale_data(sample, min_max_dict, device)
-    sample_c_norm = scale_data(sample_c, min_max_dict, device, corrupted=True)
+    sample_norm = scale_data(sample, global_min, global_max)
+    sample_c_norm = scale_data(sample_c, global_min, global_max, corrupted=True)
     #plot_tensor_batch(sample_c_norm, lons, lats, prefix="scaled_c_data")
 
     sample_reshape = reshape_batch(sample_norm)

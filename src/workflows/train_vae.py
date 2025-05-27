@@ -1,4 +1,3 @@
-
 import os
 import yaml
 import typer
@@ -11,7 +10,7 @@ import json
 import argparse
 import src.tasks.preprocessing as pre
 from torch.utils.data import DataLoader
-from src.core.dataset import setup
+from src.core.dataset import setup, set_data_params
 from torch.optim import Adam
 from tqdm import tqdm
 from src.core.models import ConvVAE
@@ -26,7 +25,9 @@ cache.register()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 @profile
-def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2):
+def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2,
+                      percent_corrupt: Annotated[float, typer.Option(min=0, max=0.9)] = 0.3,
+                      learning_rate: Annotated[float, typer.Option(min=10e-6, max=10e-2)] = 0.001):
     _locals = {k: v for k, v in locals().items() if not k.startswith("_")}
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
@@ -36,15 +37,10 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
             print(exc)
     print(config)
     ########################
-    data_params = pre.set_data_params(config)
+    data_params = set_data_params(config)
 
     dataset = setup()
     training_generator = DataLoader(dataset, **data_params)
-    #print(len(training_generator))
-    
-    #autoencoder_config = config['autoencoder_params']
-    #dataset_config = config['dataset_params']
-    #train_config = config['train_params']
     
     if os.path.exists(os.path.join("config", "min_max_dict.json")):
        with open(os.path.join("config", "min_max_dict.json"), "r") as f:
@@ -72,20 +68,19 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
         model.load_state_dict(torch.load(os.path.join("config",
                                                       "cvae.pth"), map_location=device))
     # Specify training parameters
-    num_epochs = num_epochs
-    optimizer = Adam(model.parameters(), lr=0.001)
+    optimizer = Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.BCELoss(reduction='sum')
-    losses = []
 
     for epoch_idx in range(num_epochs):
+        losses = []
         for i, sample in tqdm(enumerate(training_generator), total=len(training_generator)):
             #print(sample.shape)
             optimizer.zero_grad()
             sample = sample.float().to(device)
-            sample_c = pre.corrupt_data(sample, 0.3).float().to(device)
+            sample_c = pre.corrupt_data(sample, percent_corrupt).float().to(device)
 
-            sample_norm = pre.scale_data(sample, global_min, global_max, device)
-            sample_c_norm = pre.scale_data(sample_c, global_min, global_max, device, corrupted=True)
+            sample_norm = pre.scale_data(sample, global_min, global_max)
+            sample_c_norm = pre.scale_data(sample_c, global_min, global_max, corrupted=True)
 
             sample_reshape = pre.reshape_batch(sample_norm)
             sample_c_reshape = pre.reshape_batch(sample_c_norm)
@@ -93,7 +88,7 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
             recon, mu, log_var = model(sample_c_reshape)
             bce_loss = criterion(recon, sample_reshape)
             loss = final_loss(bce_loss, mu, log_var)
-            #losses.append(loss.item())
+            losses.append(loss.item())
             loss.backward()
             optimizer.step()
 
@@ -104,7 +99,7 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
         losses.append(loss.detach().cpu().numpy())
         print('Finished epoch:{} | Loss : {:.4f}'.format(
                 epoch_idx + 1,
-                loss.item(),
+                np.mean(losses),
             ))
 
         torch.save(model.state_dict(), os.path.join("config",

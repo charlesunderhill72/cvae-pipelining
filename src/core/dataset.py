@@ -27,8 +27,9 @@ def print_json(obj):
 class XBatcherPyTorchDataset(TorchDataset):
     def __init__(self, batch_generator: xbatcher.BatchGenerator):
         self.bgen = batch_generator
-        self.lons = None
-        self.lats = None
+        example = self.bgen[0].load()
+        self.lons = example.longitude.values.copy()
+        self.lats = example.latitude.values.copy()
 
     def __len__(self):
         return len(self.bgen)
@@ -78,7 +79,7 @@ class XBatcherPyTorchDataset(TorchDataset):
         return x
     
 
-def setup(source="gcs", split="1979", set="train",  patch_size: int = 32, input_steps: int = 1):
+def setup(source="gcs", split="1979", set="train",  patch_size_lon: int = 64, patch_size_lat: int = 32, input_steps: int = 1):
     if source == "gcs":
         ds = xr.open_dataset(
             "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
@@ -109,8 +110,8 @@ def setup(source="gcs", split="1979", set="train",  patch_size: int = 32, input_
     
     patch = dict(
         level=2,
-        longitude=64,
-        latitude=32,
+        longitude=patch_size_lon,
+        latitude=patch_size_lat,
         time=input_steps,
     )
     overlap = dict(level=0, longitude=0, latitude=0, time=input_steps // 3 * 2) # Overlap in time dimension to capture temporal correlations

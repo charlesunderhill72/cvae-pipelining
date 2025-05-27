@@ -40,6 +40,38 @@ def plot_batch_from_bgen(batch, save_path="./images/patches.png"):
     plt.tight_layout()
     fig.savefig(save_path)
 
+def plot_input_output(tensor_in, tensor_c, tensor_out, lons, lats, save_dir="./images", prefix="input_output"):
+    if (tensor_in.shape != tensor_out.shape):
+        raise ValueError("Input and Output image must have same shape.")
+
+    batch_size, num_levels, _, _ = tensor_in.shape
+
+    for b in range(batch_size):
+        fig, axes = plt.subplots(num_levels, 3, figsize=(6*num_levels, 18),
+                                subplot_kw={'projection': ccrs.PlateCarree()})
+        for l in range(num_levels):
+            ax_or = axes[l, 0]
+            ax_or.set_title(f"Original Batch {b}, Level {l}")
+            ax_or.coastlines()
+            cf = ax_or.contourf(lons, lats, tensor_in[b, l].numpy().T, 20, cmap="viridis")
+            plt.colorbar(cf, ax=ax_or)
+
+            ax_in = axes[l, 1]
+            ax_in.set_title(f"Corrupted Batch {b}, Level {l}")
+            ax_in.coastlines()
+            cf = ax_in.contourf(lons, lats, tensor_c[b, l].numpy().T, 20, cmap="viridis")
+            plt.colorbar(cf, ax=ax_in)
+
+            ax_out = axes[l, 2]
+            ax_out.set_title(f"Reconstructed Batch {b}, Level {l}")
+            ax_out.coastlines()
+            cf = ax_out.contourf(lons, lats, tensor_out[b, l].numpy().T, 20, cmap="viridis")
+            plt.colorbar(cf, ax=ax_out)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}.png"))
+        plt.close(fig)
+
 
 def plot_tensor_batch(tensor, lons, lats, save_dir="./images", prefix="batch_timestep"):
     if tensor.dim() == 4:
