@@ -4,6 +4,7 @@ import os
 import dask
 import yaml
 import xbatcher
+import torch
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -14,7 +15,7 @@ from src.core.dataset import setup, XBatcherPyTorchDataset, set_data_params
 
 
 # Add a function to make plots from batch generator
-def plot_batch_from_bgen(batch, save_path="./images/patches.png"):
+def plot_batch_from_bgen(batch: xr.Dataset, save_path: str="./images/patches.png") -> None:
     times = batch.time.values
     levels = batch.level.values
     num_levels = len(levels)
@@ -40,14 +41,15 @@ def plot_batch_from_bgen(batch, save_path="./images/patches.png"):
     plt.tight_layout()
     fig.savefig(save_path)
 
-def plot_input_output(tensor_in, tensor_c, tensor_out, lons, lats, save_dir="./images", prefix="input_output"):
+def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_out: torch.Tensor, lons: np.ndarray, 
+                      lats: np.ndarray, save_dir: str="./images", prefix: str="input_output") -> None:
     if (tensor_in.shape != tensor_out.shape):
         raise ValueError("Input and Output image must have same shape.")
 
     batch_size, num_levels, _, _ = tensor_in.shape
 
     for b in range(batch_size):
-        fig, axes = plt.subplots(num_levels, 3, figsize=(6*num_levels, 18),
+        fig, axes = plt.subplots(num_levels, 3, figsize=(8*num_levels, 20),
                                 subplot_kw={'projection': ccrs.PlateCarree()})
         for l in range(num_levels):
             ax_or = axes[l, 0]
@@ -73,7 +75,7 @@ def plot_input_output(tensor_in, tensor_c, tensor_out, lons, lats, save_dir="./i
         plt.close(fig)
 
 
-def plot_tensor_batch(tensor, lons, lats, save_dir="./images", prefix="batch_timestep"):
+def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, save_dir: str="./images", prefix: str="batch_timestep") -> None:
     if tensor.dim() == 4:
         batch_size, num_levels, _, _ = tensor.shape
 
@@ -110,7 +112,7 @@ def plot_tensor_batch(tensor, lons, lats, save_dir="./images", prefix="batch_tim
                 plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}_t{t}.png"))
                 plt.close(fig)
 
-def main(input_steps=3):
+def main(input_steps: int=3) -> None:
     ds = xr.open_dataset(
             "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
             engine="zarr",
@@ -139,7 +141,8 @@ def main(input_steps=3):
 
     sample_batch = next(iter(bgen))
     print(sample_batch)
-    plot_batch_from_bgen(sample_batch)
+    print(type(sample_batch))
+    #plot_batch_from_bgen(sample_batch)
 
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
@@ -157,8 +160,9 @@ def main(input_steps=3):
     sample = next(iter(training_generator))
     lons = dataset.lons
     lats = dataset.lats
+    print(type(lats))
 
-    plot_tensor_batch(sample, lons, lats)
+    #plot_tensor_batch(sample, lons, lats)
 
 
 

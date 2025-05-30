@@ -12,7 +12,7 @@ from tqdm import tqdm
 from src.core.dataset import setup, set_data_params
 from src.tasks.plot import plot_tensor_batch
 
-def compute_global_min_max(dataloader: DataLoader, num_channels=2) -> dict:
+def compute_global_min_max(dataloader: DataLoader, num_channels: int=2) -> dict:
     r"""
     Iterates over image attributes from Dataset class and returns global min and max.
     """
@@ -34,7 +34,7 @@ def compute_global_min_max(dataloader: DataLoader, num_channels=2) -> dict:
     return global_min_max
 
 
-def corrupt_data(tensor, k):
+def corrupt_data(tensor: torch.Tensor, k: float) -> torch.Tensor: 
     tensor_c = tensor.detach().clone()
     m, n = int(tensor_c.shape[-2]), int(tensor_c.shape[-1])
     B, T, P, C = tensor_c.shape[:4]
@@ -55,7 +55,7 @@ def corrupt_data(tensor, k):
     return tensor_c
 
 
-def scale_data(sample, global_min, global_max, corrupted=False):
+def scale_data(sample: torch.Tensor, global_min: torch.Tensor, global_max: torch.Tensor, corrupted: bool=False) -> torch.Tensor:
     # Convert min/max lists to tensors and reshape for broadcasting
     # If sample is corrupted global_min == 0
     if corrupted:
@@ -65,7 +65,7 @@ def scale_data(sample, global_min, global_max, corrupted=False):
 
     return sample_norm
 
-def reshape_batch(sample):
+def reshape_batch(sample: torch.Tensor) -> torch.Tensor:
     # Original shape: [B, T, P, C, H, W]
     B, T, P, C, H, W = sample.shape
 
@@ -76,7 +76,7 @@ def reshape_batch(sample):
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def main():
+def main() -> None:
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
         try:

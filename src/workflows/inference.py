@@ -18,7 +18,7 @@ cache.register()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def infer():
+def infer() -> None:
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
         try:

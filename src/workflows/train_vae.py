@@ -27,7 +27,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 @profile
 def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2,
                       percent_corrupt: Annotated[float, typer.Option(min=0, max=0.9)] = 0.3,
-                      learning_rate: Annotated[float, typer.Option(min=10e-6, max=10e-2)] = 0.001):
+                      learning_rate: Annotated[float, typer.Option(min=10e-6, max=10e-2)] = 0.001) -> None:
     _locals = {k: v for k, v in locals().items() if not k.startswith("_")}
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
@@ -87,6 +87,8 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
 
             recon, mu, log_var = model(sample_c_reshape)
             bce_loss = criterion(recon, sample_reshape)
+            print(type(bce_loss))
+            print(type(mu))
             loss = final_loss(bce_loss, mu, log_var)
             losses.append(loss.item())
             loss.backward()
