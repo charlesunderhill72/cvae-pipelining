@@ -11,3 +11,4 @@ xbatcher
 zarr
 cartopy
 tqdm
+flytekit

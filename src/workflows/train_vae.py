@@ -16,7 +16,6 @@ from tqdm import tqdm
 from src.core.models import ConvVAE
 from src.tasks.fit import final_loss
 from dask.cache import Cache
-from memory_profiler import profile
 
 # comment these the next two lines out to disable Dask's cache
 cache = Cache(1e10)  # 10gb cache
@@ -24,7 +23,7 @@ cache.register()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-@profile
+
 def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2,
                       percent_corrupt: Annotated[float, typer.Option(min=0, max=0.9)] = 0.3,
                       learning_rate: Annotated[float, typer.Option(min=10e-6, max=10e-2)] = 0.001) -> None:
