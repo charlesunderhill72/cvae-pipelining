@@ -8,14 +8,15 @@ import torch
 import torch.nn.functional as F
 import json
 import argparse
-import src.tasks.preprocessing as pre
+import tasks.preprocessing as pre
 from torch.utils.data import DataLoader
-from src.core.dataset import setup, set_data_params
+from core.dataset import setup, set_data_params
 from torch.optim import Adam
 from tqdm import tqdm
-from src.core.models import ConvVAE
-from src.tasks.fit import final_loss
+from core.models import ConvVAE
+from tasks.fit import final_loss
 from dask.cache import Cache
+import flytekit as fl
 
 # comment these the next two lines out to disable Dask's cache
 cache = Cache(1e10)  # 10gb cache
@@ -23,7 +24,7 @@ cache.register()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
+@fl.workflow
 def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2,
                       percent_corrupt: Annotated[float, typer.Option(min=0, max=0.9)] = 0.3,
                       learning_rate: Annotated[float, typer.Option(min=10e-6, max=10e-2)] = 0.001) -> None:

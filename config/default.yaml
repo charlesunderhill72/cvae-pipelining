@@ -4,10 +4,10 @@ plot_params:
 data_params:
   batch_size: 1
   shuffle: True
-  num_workers: 2
-  prefetch_factor: 1
-  persistent_workers: True
-  pin_memory: True
+  num_workers: null
+  prefetch_factor: null
+  persistent_workers: null
+  pin_memory: null
   dask_threads: 4
 
 main_params:

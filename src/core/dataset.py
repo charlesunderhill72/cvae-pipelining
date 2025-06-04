@@ -73,7 +73,7 @@ class XBatcherPyTorchDataset(TorchDataset):
                 "time": t1,
                 "idx": idx,
                 "pid": multiprocessing.current_process().pid,
-               "duration": t1 - t0,
+                "duration": t1 - t0,
             }
         )
         return x

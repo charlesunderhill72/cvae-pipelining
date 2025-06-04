@@ -11,10 +11,28 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from torch.utils.data import DataLoader
-from src.core.dataset import setup, XBatcherPyTorchDataset, set_data_params
+from core.dataset import setup, XBatcherPyTorchDataset, set_data_params
+import flytekit as fl
+
+image_spec = fl.ImageSpec(
+    # The name of the image. This image will be used by the `say_hello`` task.
+    name="preprocessing-image",
+
+    # Lock file with dependencies to be installed in the image.
+    requirements="uv.lock",
+
+    # Image registry to to which this image will be pushed.
+    # Set the Environment variable FLYTE_IMAGE_REGISTRY to the URL of your registry.
+    # The image will be built on your local machine, so enure that your Docker is running.
+    # Ensure that pushed image is accessible to your Flyte cluster, so that it can pull the image
+    # when it spins up the task container.
+    registry=os.environ.get("FLYTE_IMAGE_REGISTRY", "ghcr.io/charlesunderhill72"),
+    source_root="src"
+    )
 
 
 # Add a function to make plots from batch generator
+@fl.task(container_image=image_spec)
 def plot_batch_from_bgen(batch: xr.Dataset, save_path: str="./images/patches.png") -> None:
     times = batch.time.values
     levels = batch.level.values
@@ -41,6 +59,7 @@ def plot_batch_from_bgen(batch: xr.Dataset, save_path: str="./images/patches.png
     plt.tight_layout()
     fig.savefig(save_path)
 
+@fl.task(container_image=image_spec)
 def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_out: torch.Tensor, lons: np.ndarray, 
                       lats: np.ndarray, save_dir: str="./images", prefix: str="input_output") -> None:
     if (tensor_in.shape != tensor_out.shape):
@@ -75,6 +94,7 @@ def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_ou
         plt.close(fig)
 
 
+@fl.task(container_image=image_spec)
 def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, save_dir: str="./images", prefix: str="batch_timestep") -> None:
     if tensor.dim() == 4:
         batch_size, num_levels, _, _ = tensor.shape
@@ -112,6 +132,7 @@ def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, 
                 plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}_t{t}.png"))
                 plt.close(fig)
 
+@fl.workflow
 def main(input_steps: int=3) -> None:
     ds = xr.open_dataset(
             "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",

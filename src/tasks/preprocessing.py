@@ -1,5 +1,3 @@
-"""Corrupt data and pad if necessary?"""
-
 import os
 import json
 import yaml
@@ -9,12 +7,28 @@ import numpy as np
 import xarray as xr
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from src.core.dataset import setup, set_data_params
-from src.tasks.plot import plot_tensor_batch
+from core.dataset import setup, set_data_params
+from tasks.plot import plot_tensor_batch
 import flytekit as fl
 
+image_spec = fl.ImageSpec(
+    # The name of the image. This image will be used by the `say_hello`` task.
+    name="preprocessing-image",
+
+    # Lock file with dependencies to be installed in the image.
+    requirements="uv.lock",
+
+    # Image registry to to which this image will be pushed.
+    # Set the Environment variable FLYTE_IMAGE_REGISTRY to the URL of your registry.
+    # The image will be built on your local machine, so enure that your Docker is running.
+    # Ensure that pushed image is accessible to your Flyte cluster, so that it can pull the image
+    # when it spins up the task container.
+    registry=os.environ.get("FLYTE_IMAGE_REGISTRY", "ghcr.io/charlesunderhill72"),
+    source_root="src"
+    )
 
 
+@fl.task(container_image=image_spec)
 def compute_global_min_max(dataloader: DataLoader, num_channels: int=2) -> dict:
     r"""
     Iterates over image attributes from Dataset class and returns global min and max.
@@ -36,7 +50,7 @@ def compute_global_min_max(dataloader: DataLoader, num_channels: int=2) -> dict:
 
     return global_min_max
 
-
+@fl.task(container_image=image_spec)
 def corrupt_data(tensor: torch.Tensor, k: float) -> torch.Tensor: 
     tensor_c = tensor.detach().clone()
     m, n = int(tensor_c.shape[-2]), int(tensor_c.shape[-1])
@@ -55,9 +69,9 @@ def corrupt_data(tensor: torch.Tensor, k: float) -> torch.Tensor:
 
     tensor_c *= mask  # Apply mask
 
-    return tensor_c
+    return tensor_c.to("cuda" if torch.cuda.is_available() else "cpu")
 
-
+@fl.task(container_image=image_spec)
 def scale_data(sample: torch.Tensor, global_min: torch.Tensor, global_max: torch.Tensor, corrupted: bool=False) -> torch.Tensor:
     # Convert min/max lists to tensors and reshape for broadcasting
     # If sample is corrupted global_min == 0
@@ -68,6 +82,7 @@ def scale_data(sample: torch.Tensor, global_min: torch.Tensor, global_max: torch
 
     return sample_norm
 
+@fl.task(container_image=image_spec)
 def reshape_batch(sample: torch.Tensor) -> torch.Tensor:
     # Original shape: [B, T, P, C, H, W]
     B, T, P, C, H, W = sample.shape
@@ -79,6 +94,7 @@ def reshape_batch(sample: torch.Tensor) -> torch.Tensor:
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+@fl.workflow
 def main() -> None:
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
@@ -89,6 +105,9 @@ def main() -> None:
     print(config)
     ########################
     data_params = set_data_params(config)
+
+    # Below line added to try and resolve sample generation using multiple workers with fl
+    #os.environ["PYTHONPATH"] = os.path.abspath("src")  # or just "src" if you're sure of working dir
 
     dataset = setup()
     training_generator = DataLoader(dataset, **data_params)
@@ -109,7 +128,7 @@ def main() -> None:
     print("Global_max:", global_max)
 
     sample = next(iter(training_generator)).to(device)
-    sample_c = corrupt_data(sample, 0.3).to(device)
+    sample_c = corrupt_data(sample, 0.3)
 
     print(sample_c.shape)
 

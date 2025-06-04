@@ -4,12 +4,13 @@ import os
 import json
 import yaml
 import torch
-from src.core.models import ConvVAE
-from src.core.dataset import setup, set_data_params
-from src.tasks.plot import plot_input_output
-import src.tasks.preprocessing as pre
+from core.models import ConvVAE
+from core.dataset import setup, set_data_params
+from tasks.plot import plot_input_output
+import tasks.preprocessing as pre
 from torch.utils.data import DataLoader
 from dask.cache import Cache
+import flytekit as fl
 
 # comment these the next two lines out to disable Dask's cache
 cache = Cache(1e10)  # 10gb cache
@@ -17,7 +18,7 @@ cache.register()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
+@fl.workflow
 def infer() -> None:
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
