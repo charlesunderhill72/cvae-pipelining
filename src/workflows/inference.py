@@ -4,6 +4,7 @@ import os
 import json
 import yaml
 import torch
+import numpy as np
 from core.models import ConvVAE
 from core.dataset import setup, set_data_params
 from tasks.plot import plot_input_output
@@ -12,11 +13,39 @@ from torch.utils.data import DataLoader
 from dask.cache import Cache
 import flytekit as fl
 
+image_spec = fl.ImageSpec(
+    # The name of the image. This image will be used by the `say_hello`` task.
+    name="preprocessing-image",
+
+    # Lock file with dependencies to be installed in the image.
+    requirements="uv.lock",
+
+    # Image registry to to which this image will be pushed.
+    # Set the Environment variable FLYTE_IMAGE_REGISTRY to the URL of your registry.
+    # The image will be built on your local machine, so enure that your Docker is running.
+    # Ensure that pushed image is accessible to your Flyte cluster, so that it can pull the image
+    # when it spins up the task container.
+    registry=os.environ.get("FLYTE_IMAGE_REGISTRY", "ghcr.io/charlesunderhill72"),
+    source_root="src"
+    )
+
+
 # comment these the next two lines out to disable Dask's cache
 cache = Cache(1e10)  # 10gb cache
 cache.register()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+@fl.task(container_image=image_spec)
+def generate_sample(model: ConvVAE, corrupted_sample: torch.Tensor) -> torch.Tensor:
+    with torch.no_grad():
+        recon, _, _ = model(corrupted_sample)
+    
+    return recon
+
+@fl.task(container_image=image_spec)
+def plot_task(sample: torch.Tensor, corrupted_sample: torch.Tensor, recon: torch.Tensor, lons: np.ndarray, lats: np.ndarray) -> None:
+    plot_input_output(sample.cpu(), corrupted_sample.cpu(), recon.cpu(), lons, lats)
 
 @fl.workflow
 def infer() -> None:
@@ -58,7 +87,7 @@ def infer() -> None:
     print(sample.shape)
 
     sample = sample.float().to(device)
-    sample_c = pre.corrupt_data(sample, 0.3).float().to(device)
+    sample_c = pre.corrupt_data(sample, 0.3)
 
     sample_norm = pre.scale_data(sample, global_min, global_max)
     sample_c_norm = pre.scale_data(sample_c, global_min, global_max, corrupted=True)
@@ -66,12 +95,11 @@ def infer() -> None:
     sample_reshape = pre.reshape_batch(sample_norm)
     sample_c_reshape = pre.reshape_batch(sample_c_norm)
 
-    with torch.no_grad():
-        recon, _, _ = model(sample_c_reshape)
+    recon = generate_sample(model, sample_c_reshape)
 
     print(recon.shape)
 
-    plot_input_output(sample_reshape.cpu(), sample_c_reshape.cpu(), recon.cpu(), dataset.lons, dataset.lats)
+    plot_task(sample_reshape, sample_c_reshape, recon, dataset.lons, dataset.lats)
 
 
 if __name__ == "__main__":

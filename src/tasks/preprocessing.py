@@ -8,7 +8,7 @@ import xarray as xr
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from core.dataset import setup, set_data_params
-from tasks.plot import plot_tensor_batch
+#from tasks.plot import plot_tensor_batch
 import flytekit as fl
 
 image_spec = fl.ImageSpec(
@@ -69,7 +69,7 @@ def corrupt_data(tensor: torch.Tensor, k: float) -> torch.Tensor:
 
     tensor_c *= mask  # Apply mask
 
-    return tensor_c.to("cuda" if torch.cuda.is_available() else "cpu")
+    return tensor_c.float().to("cuda" if torch.cuda.is_available() else "cpu")
 
 @fl.task(container_image=image_spec)
 def scale_data(sample: torch.Tensor, global_min: torch.Tensor, global_max: torch.Tensor, corrupted: bool=False) -> torch.Tensor:

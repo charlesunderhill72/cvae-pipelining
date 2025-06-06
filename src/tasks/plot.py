@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from torch.utils.data import DataLoader
-from core.dataset import setup, XBatcherPyTorchDataset, set_data_params
+from core.dataset import setup, set_data_params
 import flytekit as fl
 
 image_spec = fl.ImageSpec(
@@ -132,8 +132,8 @@ def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, 
                 plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}_t{t}.png"))
                 plt.close(fig)
 
-@fl.workflow
-def main(input_steps: int=3) -> None:
+@fl.task(container_image=image_spec)
+def create_bgen(input_steps: int=3) -> xbatcher.BatchGenerator:
     ds = xr.open_dataset(
             "gs://weatherbench2/datasets/era5/1959-2023_01_10-6h-64x32_equiangular_conservative.zarr",
             engine="zarr",
@@ -160,7 +160,17 @@ def main(input_steps: int=3) -> None:
         preload_batch=False,
     )
 
-    sample_batch = next(iter(bgen))
+    return bgen
+
+@fl.task(container_image=image_spec)
+def create_sample(bgen: xbatcher.BatchGenerator) -> xr.Dataset:
+    return next(iter(bgen))
+
+@fl.workflow
+def main(input_steps: int=3) -> None:
+    bgen = create_bgen(input_steps)
+
+    sample_batch = create_sample(bgen)
     print(sample_batch)
     print(type(sample_batch))
     #plot_batch_from_bgen(sample_batch)
