@@ -2,7 +2,7 @@ plot_params:
   im_path: "images"
 
 data_params:
-  batch_size: 1
+  batch_size: 5
   shuffle: True
   num_workers: null
   prefetch_factor: null

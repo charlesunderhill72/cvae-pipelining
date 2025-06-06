@@ -9,6 +9,7 @@ dependencies = [
     "cartopy>=0.24.1",
     "dask>=2025.5.1",
     "flytekit>=1.15.4",
+    "flytekitplugins-deck-standard",
     "gcsfs>=2025.5.1",
     "matplotlib>=3.10.3",
     "numpy>=2.2.6",

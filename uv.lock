@@ -495,6 +495,7 @@ dependencies = [
     { name = "cartopy" },
     { name = "dask" },
     { name = "flytekit" },
+    { name = "flytekitplugins-deck-standard" },
     { name = "gcsfs" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -513,6 +514,7 @@ requires-dist = [
     { name = "cartopy", specifier = ">=0.24.1" },
     { name = "dask", specifier = ">=2025.5.1" },
     { name = "flytekit", specifier = ">=1.15.4" },
+    { name = "flytekitplugins-deck-standard" },
     { name = "gcsfs", specifier = ">=2025.5.1" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "numpy", specifier = ">=2.2.6" },
@@ -687,6 +689,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/30/91/3d17b8862115f6c426b8b9a32a16f599abffd82d0c8fbab643e406e2171a/flytekit-1.15.4.tar.gz", hash = "sha256:3520c7dcdeafc7f7d7418c1e9dca114f867bf81efb076beeecff37a272e18e0f", size = 556686, upload-time = "2025-04-22T23:05:52.786Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/50/a6/06499803ba31f1f725d50c874a6a1eb0e782c1c891a6e497e827b0aaa782/flytekit-1.15.4-py3-none-any.whl", hash = "sha256:c0a16cff5bb20b48c49525e974fe55a6885ca19e6f3c535fbe65e9815ffa566b", size = 658043, upload-time = "2025-04-22T23:05:50.308Z" },
+]
+
+[[package]]
+name = "flytekitplugins-deck-standard"
+version = "1.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flytekit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7f/36/aad37c9878c1c8d08c250ed4eea2eb83878ad88c58c9d042991faa66c1fd/flytekitplugins_deck_standard-1.16.0.tar.gz", hash = "sha256:6ad4f2cae8e06d779d56fb88abd109a7e68489321726d91715dcca48045cbc87", size = 6269, upload-time = "2025-05-30T22:39:46.114Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/17/21/ee70f1c6a834d503d2b62549ec2c7825c4d828d5f2c66b9f77c1ca7d0283/flytekitplugins_deck_standard-1.16.0-py3-none-any.whl", hash = "sha256:7c0805c1d465cf7fa53ae9f4defa1b44f6f90248a924a9f8adc2645f8d569bf6", size = 6533, upload-time = "2025-05-30T22:39:02.575Z" },
 ]
 
 [[package]]

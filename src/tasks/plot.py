@@ -1,5 +1,6 @@
 """The goal for this module is a flexible plotting tool."""
 
+import io
 import os
 import dask
 import yaml
@@ -8,27 +9,15 @@ import torch
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
+from PIL import Image
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from torch.utils.data import DataLoader
 from core.dataset import setup, set_data_params
+from orchestration.constants import image_spec
+from flytekit.types.file import PNGImageFile
+from flytekitplugins.deck.renderer import ImageRenderer
 import flytekit as fl
-
-image_spec = fl.ImageSpec(
-    # The name of the image. This image will be used by the `say_hello`` task.
-    name="preprocessing-image",
-
-    # Lock file with dependencies to be installed in the image.
-    requirements="uv.lock",
-
-    # Image registry to to which this image will be pushed.
-    # Set the Environment variable FLYTE_IMAGE_REGISTRY to the URL of your registry.
-    # The image will be built on your local machine, so enure that your Docker is running.
-    # Ensure that pushed image is accessible to your Flyte cluster, so that it can pull the image
-    # when it spins up the task container.
-    registry=os.environ.get("FLYTE_IMAGE_REGISTRY", "ghcr.io/charlesunderhill72"),
-    source_root="src"
-    )
 
 
 # Add a function to make plots from batch generator
@@ -94,8 +83,8 @@ def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_ou
         plt.close(fig)
 
 
-@fl.task(container_image=image_spec)
-def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, save_dir: str="./images", prefix: str="batch_timestep") -> None:
+@fl.task(enable_deck=True, container_image=image_spec)
+def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, save_dir: str="images", prefix: str="batch_timestep") -> list[PNGImageFile]:
     if tensor.dim() == 4:
         batch_size, num_levels, _, _ = tensor.shape
 
@@ -110,12 +99,15 @@ def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, 
                 plt.colorbar(cf, ax=ax)
 
             plt.tight_layout()
+            os.makedirs(save_dir, exist_ok=True)
             plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}.png"))
             plt.close(fig)
 
     else:
         batch_size, time_steps, patches, num_levels, _, _ = tensor.shape
 
+        output_paths = []
+        html = ""
         for b in range(batch_size):
             for t in range(time_steps):
                 fig, axes = plt.subplots(patches, num_levels, figsize=(6*num_levels, 4*patches),
@@ -129,8 +121,26 @@ def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, 
                         plt.colorbar(cf, ax=ax)
 
                 plt.tight_layout()
-                plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}_t{t}.png"))
+                os.makedirs(save_dir, exist_ok=True)
+                path = os.path.join(save_dir, f"{prefix}_b{b}_t{t}.png")
+                # Save figure to an in-memory buffer
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png')
+                buf.seek(0)
+
+                # Convert buffer to PIL Image
+                image = Image.open(buf)
+
+                # Use ImageRenderer to generate HTML and attach to deck
+                html += ImageRenderer().to_html(image_src=image)
+                #fl.Deck("Matplotlib Plot", ImageRenderer().to_html(image_src=image))
+                plt.savefig(path)
+                output_paths.append(PNGImageFile(path))
                 plt.close(fig)
+
+        fl.Deck("Matplotlib Plot", html)
+
+        return output_paths
 
 @fl.task(container_image=image_spec)
 def create_bgen(input_steps: int=3) -> xbatcher.BatchGenerator:
