@@ -77,6 +77,10 @@ def reshape_batch(sample: torch.Tensor) -> torch.Tensor:
 
     return sample_vae_input
 
+@fl.task(requests=fl.Resources(mem="4Gi"), limits=fl.Resources(mem="8Gi"), container_image=image_spec)
+def sample_dataloader(dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
+    return next(iter(dataloader)).to(device)
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 @fl.workflow
@@ -112,7 +116,7 @@ def main() -> None:
     print("Global_min:", global_min)
     print("Global_max:", global_max)
 
-    sample = next(iter(training_generator)).to(device)
+    sample = sample_dataloader(training_generator)
     sample_c = corrupt_data(sample, 0.3)
 
     #print(sample_c.shape)

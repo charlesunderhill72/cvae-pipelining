@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from dask.cache import Cache
 from orchestration.constants import image_spec
 import flytekit as fl
+from flytekit.types.file import FlyteFile
 
 
 # comment these the next two lines out to disable Dask's cache
@@ -32,8 +33,30 @@ def generate_sample(model: ConvVAE, corrupted_sample: torch.Tensor) -> torch.Ten
 def plot_task(sample: torch.Tensor, corrupted_sample: torch.Tensor, recon: torch.Tensor, lons: np.ndarray, lats: np.ndarray) -> None:
     plot_input_output(sample.cpu(), corrupted_sample.cpu(), recon.cpu(), lons, lats)
 
+@fl.task(container_image=image_spec)
+def load_model_checkpoint(checkpoint: FlyteFile) -> ConvVAE:
+    # Download file locally from FlyteBlob/S3/etc.
+    local_path = checkpoint.download()
+    
+    # Load the model checkpoint
+    model = torch.load(local_path, weights_only=False)
+    
+    # If needed: reinstantiate model class and load state_dict
+    my_model = ConvVAE(...)
+    my_model.load_state_dict(model['state_dict'])
+
+    my_model.eval()
+    
+    return my_model
+
+@fl.task(container_image=image_spec)
+def check_for_gpu() -> bool:
+    print(torch.cuda.is_available())
+    return torch.cuda.is_available()
+
 @fl.workflow
 def infer() -> None:
+    check_for_gpu()
     # Read the config file #
     with open("config/default.yaml", 'r') as file:
         try:
@@ -63,15 +86,16 @@ def infer() -> None:
     global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
     
     # Load autoencoder with checkpoint
-    model = ConvVAE().to(device)
-    model.load_state_dict(torch.load(os.path.join("config",
-                                                  "cvae.pth"), map_location=device))
-    model.eval()
+    #model = ConvVAE().to(device)
+    #model.load_state_dict(torch.load(os.path.join("config",
+    #                                              "cvae.pth"), map_location=device, weights_only=False))
+    #model.eval()
+    model = load_model_checkpoint(os.path.join("config", "cvae.pth"))
 
-    sample = next(iter(training_generator))
+    sample = pre.sample_dataloader(training_generator)
     print(sample.shape)
 
-    sample = sample.float().to(device)
+    #sample = sample.float().to(device)
     sample_c = pre.corrupt_data(sample, 0.3)
 
     sample_norm = pre.scale_data(sample, global_min, global_max)

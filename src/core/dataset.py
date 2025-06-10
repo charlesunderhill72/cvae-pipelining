@@ -139,7 +139,7 @@ def set_data_params(config):
         data_params["shuffle"] = params["shuffle"]
     if params.get("num_workers") is not None:
         data_params["num_workers"] = params["num_workers"]
-        data_params["multiprocessing_context"] = "forkserver"
+        data_params["multiprocessing_context"] = params["multiprocessing_context"]
     if params.get("prefetch_factor") is not None:
         data_params["prefetch_factor"] = params["prefetch_factor"]
     if params.get("persistent_workers") is not None:

@@ -4,10 +4,11 @@ plot_params:
 data_params:
   batch_size: 5
   shuffle: True
-  num_workers: null
-  prefetch_factor: null
-  persistent_workers: null
-  pin_memory: null
+  num_workers: 2
+  multiprocessing_context: "forkserver"
+  prefetch_factor: 1
+  persistent_workers: True
+  pin_memory: True
   dask_threads: 4
 
 main_params:

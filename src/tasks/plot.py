@@ -48,7 +48,7 @@ def plot_batch_from_bgen(batch: xr.Dataset, save_path: str="./images/patches.png
     plt.tight_layout()
     fig.savefig(save_path)
 
-@fl.task(container_image=image_spec)
+@fl.task(enable_deck=True, container_image=image_spec)
 def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_out: torch.Tensor, lons: np.ndarray, 
                       lats: np.ndarray, save_dir: str="./images", prefix: str="input_output") -> None:
     if (tensor_in.shape != tensor_out.shape):
@@ -79,12 +79,26 @@ def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_ou
             plt.colorbar(cf, ax=ax_out)
 
         plt.tight_layout()
-        plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}.png"))
+        os.makedirs(save_dir, exist_ok=True)
+        path = os.path.join(save_dir, f"{prefix}_b{b}.png")
+        # Save figure to an in-memory buffer
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png')
+        buf.seek(0)
+
+        # Convert buffer to PIL Image
+        image = Image.open(buf)
+            
+        # Use ImageRenderer to generate HTML and attach to deck
+        html += ImageRenderer().to_html(image_src=image)
+        plt.savefig(path)
         plt.close(fig)
+            
+    fl.Deck("Matplotlib Plot", html)
 
 
 @fl.task(enable_deck=True, container_image=image_spec)
-def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, save_dir: str="images", prefix: str="batch_timestep") -> list[PNGImageFile]:
+def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, save_dir: str="images", prefix: str="batch_timestep") -> None:
     if tensor.dim() == 4:
         batch_size, num_levels, _, _ = tensor.shape
 
@@ -98,15 +112,28 @@ def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, 
                 cf = ax.contourf(lons, lats, tensor[b, l].numpy().T, 20, cmap="viridis")
                 plt.colorbar(cf, ax=ax)
 
+            
             plt.tight_layout()
             os.makedirs(save_dir, exist_ok=True)
-            plt.savefig(os.path.join(save_dir, f"{prefix}_b{b}.png"))
+            path = os.path.join(save_dir, f"{prefix}_b{b}.png")
+            # Save figure to an in-memory buffer
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png')
+            buf.seek(0)
+
+            # Convert buffer to PIL Image
+            image = Image.open(buf)
+
+            # Use ImageRenderer to generate HTML and attach to deck
+            html += ImageRenderer().to_html(image_src=image)
+            plt.savefig(path)
             plt.close(fig)
+
+        fl.Deck("Matplotlib Plot", html)
 
     else:
         batch_size, time_steps, patches, num_levels, _, _ = tensor.shape
 
-        output_paths = []
         html = ""
         for b in range(batch_size):
             for t in range(time_steps):
@@ -133,14 +160,10 @@ def plot_tensor_batch(tensor: torch.Tensor, lons: np.ndarray, lats: np.ndarray, 
 
                 # Use ImageRenderer to generate HTML and attach to deck
                 html += ImageRenderer().to_html(image_src=image)
-                #fl.Deck("Matplotlib Plot", ImageRenderer().to_html(image_src=image))
                 plt.savefig(path)
-                output_paths.append(PNGImageFile(path))
                 plt.close(fig)
 
         fl.Deck("Matplotlib Plot", html)
-
-        return output_paths
 
 @fl.task(container_image=image_spec)
 def create_bgen(input_steps: int=3) -> xbatcher.BatchGenerator:
@@ -173,14 +196,20 @@ def create_bgen(input_steps: int=3) -> xbatcher.BatchGenerator:
     return bgen
 
 @fl.task(container_image=image_spec)
-def create_sample(bgen: xbatcher.BatchGenerator) -> xr.Dataset:
+def sample_bgen(bgen: xbatcher.BatchGenerator) -> xr.Dataset:
     return next(iter(bgen))
+
+@fl.task(requests=fl.Resources(mem="4Gi"), limits=fl.Resources(mem="8Gi"), container_image=image_spec)
+def sample_dataloader(dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
+    return next(iter(dataloader)).to(device)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 @fl.workflow
 def main(input_steps: int=3) -> None:
     bgen = create_bgen(input_steps)
 
-    sample_batch = create_sample(bgen)
+    sample_batch = sample_bgen(bgen)
     print(sample_batch)
     print(type(sample_batch))
     #plot_batch_from_bgen(sample_batch)
@@ -198,12 +227,12 @@ def main(input_steps: int=3) -> None:
     dataset = setup()
     training_generator = DataLoader(dataset, **data_params)
     
-    sample = next(iter(training_generator))
+    sample = sample_dataloader(training_generator)
     lons = dataset.lons
     lats = dataset.lats
     print(type(lats))
 
-    #plot_tensor_batch(sample, lons, lats)
+    plot_tensor_batch(sample, lons, lats)
 
 
 
