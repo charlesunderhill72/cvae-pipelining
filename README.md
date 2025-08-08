@@ -41,3 +41,31 @@ project/
 ```
 
 
+## 🚀 Usage
+
+### Setup
+
+1. Clone this repo
+2. Set up a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+3. Place your input .zarr or .nc data where the xbatcher.BatchGenerator can access it (configured in default.yaml).
+
+## Training
+
+Run the training pipeline:
+```
+python -m src.workflows.train_vae --num-epochs 20
+```
+This will:
+
+* Load the dataset
+
+* Generate global min/max stats (if not already saved)
+
+* Train the CVAE for the specified number of epochs
+
+* Save a model checkpoint to config/cvae.pth
+
