@@ -2,6 +2,7 @@ import os
 import flytekit as fl
 
 image_spec = fl.ImageSpec(
+    base_image="nvidia/cuda:12.6.1-cudnn-devel-ubuntu22.04",
     # The name of the image. This image will be used by the `say_hello`` task.
     name="preprocessing-image",
 

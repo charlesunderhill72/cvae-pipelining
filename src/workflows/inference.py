@@ -14,6 +14,7 @@ from dask.cache import Cache
 from orchestration.constants import image_spec
 import flytekit as fl
 from flytekit.types.file import FlyteFile
+from flytekit.extras.pytorch import PyTorchCheckpoint
 
 
 # comment these the next two lines out to disable Dask's cache
@@ -33,23 +34,31 @@ def generate_sample(model: ConvVAE, corrupted_sample: torch.Tensor) -> torch.Ten
 def plot_task(sample: torch.Tensor, corrupted_sample: torch.Tensor, recon: torch.Tensor, lons: np.ndarray, lats: np.ndarray) -> None:
     plot_input_output(sample.cpu(), corrupted_sample.cpu(), recon.cpu(), lons, lats)
 
-@fl.task(container_image=image_spec)
-def load_model_checkpoint(checkpoint: FlyteFile) -> ConvVAE:
+@fl.task(container_image=image_spec, limits=fl.Resources(gpu="1"))
+def load_model_checkpoint(checkpoint: FlyteFile) -> PyTorchCheckpoint:
     # Download file locally from FlyteBlob/S3/etc.
     local_path = checkpoint.download()
-    
+    print(local_path)
     # Load the model checkpoint
-    model = torch.load(local_path, weights_only=False)
-    
+    model = torch.load(local_path, map_location=device, weights_only=False)
+    print(type(model))
+
     # If needed: reinstantiate model class and load state_dict
-    my_model = ConvVAE(...)
-    my_model.load_state_dict(model['state_dict'])
+    my_model = ConvVAE().to(device)
+    my_model.load_state_dict(model)
 
     my_model.eval()
     
-    return my_model
+    return PyTorchCheckpoint(module=my_model)
 
-@fl.task(container_image=image_spec)
+@fl.task(container_image=image_spec, limits=fl.Resources(gpu="1"))
+def load_model(checkpoint: PyTorchCheckpoint) -> ConvVAE:
+    new_model = ConvVAE()
+    new_model.load_state_dict(checkpoint["module_state_dict"])
+
+    return new_model
+
+@fl.task(container_image=image_spec, limits=fl.Resources(gpu="1"))
 def check_for_gpu() -> bool:
     print(torch.cuda.is_available())
     return torch.cuda.is_available()
@@ -85,12 +94,9 @@ def infer() -> None:
     global_min = torch.tensor(min_max_dict["global_min"]).view(1, 1, 1, -1, 1, 1).to(device)
     global_max = torch.tensor(min_max_dict["global_max"]).view(1, 1, 1, -1, 1, 1).to(device)
     
-    # Load autoencoder with checkpoint
-    #model = ConvVAE().to(device)
-    #model.load_state_dict(torch.load(os.path.join("config",
-    #                                              "cvae.pth"), map_location=device, weights_only=False))
-    #model.eval()
-    model = load_model_checkpoint(os.path.join("config", "cvae.pth"))
+    checkpoint = load_model_checkpoint(os.path.join("config", "cvae.pth"))
+
+    model = load_model(checkpoint)
 
     sample = pre.sample_dataloader(training_generator)
     print(sample.shape)
