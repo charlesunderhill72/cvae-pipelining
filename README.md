@@ -18,6 +18,7 @@ This project implements a training pipeline for a **Convolutional Variational Au
 
 ## 📁 Project Structure
 
+```
 project/
 │
 ├── config/
@@ -37,5 +38,6 @@ project/
 │ └── helpers.py # Utility methods
 │
 └── README.md
+```
 
 
