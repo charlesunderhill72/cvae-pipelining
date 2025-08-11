@@ -1,4 +1,7 @@
+import sys
 import os
+sys.path.insert(1, os.path.join(os.getcwd(), 'src'))
+
 import yaml
 import typer
 from typing import Optional

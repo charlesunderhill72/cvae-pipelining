@@ -1,6 +1,9 @@
 """Basic infrastructure code to use the trained model 
 to take in corrupted data and generate an uncorrupted sample."""
+import sys
 import os
+sys.path.insert(1, os.path.join(os.getcwd(), 'src'))
+
 import json
 import yaml
 import torch
@@ -16,7 +19,7 @@ import flytekit as fl
 from flytekit.types.file import FlyteFile
 from flytekit.extras.pytorch import PyTorchCheckpoint
 
-
+torch.serialization.add_safe_globals([ConvVAE, torch.nn.modules.conv.Conv2d, torch.nn.modules.linear.Linear, torch.nn.modules.conv.ConvTranspose2d])
 # comment these the next two lines out to disable Dask's cache
 cache = Cache(1e10)  # 10gb cache
 cache.register()

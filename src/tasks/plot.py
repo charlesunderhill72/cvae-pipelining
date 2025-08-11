@@ -1,7 +1,9 @@
 """The goal for this module is a flexible plotting tool."""
+import sys
+import os
+sys.path.insert(1, os.path.join(os.getcwd(), 'src'))
 
 import io
-import os
 import dask
 import yaml
 import xbatcher
@@ -51,6 +53,7 @@ def plot_batch_from_bgen(batch: xr.Dataset, save_path: str="./images/patches.png
 @fl.task(enable_deck=True, container_image=image_spec)
 def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_out: torch.Tensor, lons: np.ndarray, 
                       lats: np.ndarray, save_dir: str="./images", prefix: str="input_output") -> None:
+    html = ""
     if (tensor_in.shape != tensor_out.shape):
         raise ValueError("Input and Output image must have same shape.")
 
@@ -63,19 +66,19 @@ def plot_input_output(tensor_in: torch.Tensor, tensor_c: torch.Tensor, tensor_ou
             ax_or = axes[l, 0]
             ax_or.set_title(f"Original Batch {b}, Level {l}")
             ax_or.coastlines()
-            cf = ax_or.contourf(lons, lats, tensor_in[b, l].numpy().T, 20, cmap="viridis")
+            cf = ax_or.contourf(lons, lats, tensor_in[b, l].cpu().numpy().T, 20, cmap="viridis")
             plt.colorbar(cf, ax=ax_or)
 
             ax_in = axes[l, 1]
             ax_in.set_title(f"Corrupted Batch {b}, Level {l}")
             ax_in.coastlines()
-            cf = ax_in.contourf(lons, lats, tensor_c[b, l].numpy().T, 20, cmap="viridis")
+            cf = ax_in.contourf(lons, lats, tensor_c[b, l].cpu().numpy().T, 20, cmap="viridis")
             plt.colorbar(cf, ax=ax_in)
 
             ax_out = axes[l, 2]
             ax_out.set_title(f"Reconstructed Batch {b}, Level {l}")
             ax_out.coastlines()
-            cf = ax_out.contourf(lons, lats, tensor_out[b, l].numpy().T, 20, cmap="viridis")
+            cf = ax_out.contourf(lons, lats, tensor_out[b, l].cpu().numpy().T, 20, cmap="viridis")
             plt.colorbar(cf, ax=ax_out)
 
         plt.tight_layout()
