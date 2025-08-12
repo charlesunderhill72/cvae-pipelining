@@ -22,6 +22,8 @@ from dask.cache import Cache
 from orchestration.constants import image_spec
 import flytekit as fl
 
+torch.serialization.add_safe_globals([ConvVAE, torch.nn.modules.conv.Conv2d, torch.nn.modules.linear.Linear, torch.nn.modules.conv.ConvTranspose2d, 
+                                      torch.nn.modules.loss.BCELoss])
 
 # comment these the next two lines out to disable Dask's cache
 cache = Cache(1e10)  # 10gb cache
@@ -34,6 +36,36 @@ def configure_optimizer(model: ConvVAE, learning_rate: float) -> torch.optim.Ada
     optimizer = Adam(model.parameters(), lr=learning_rate)
 
     return optimizer
+
+@fl.task(container_image=image_spec)
+def compute_bce(criterion: torch.nn.BCELoss, recon: torch.Tensor, sample: torch.Tensor) -> torch.Tensor:
+    return criterion(recon, sample)
+
+@fl.task(container_image=image_spec)
+def reconstruct_sample(model: ConvVAE, sample: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    return model(sample)
+
+@fl.task(container_image=image_spec)
+def append_losses(losses: list[float], loss: torch.Tensor) -> None:
+    losses.append(loss.item())
+    
+@fl.task(container_image=image_spec)
+def print_loss(losses: list[float], loss: torch.Tensor, epoch_idx: int) -> None:
+    losses.append(loss.detach().cpu().numpy())
+    print('Finished epoch:{} | Loss : {:.4f}'.format(
+            epoch_idx + 1,
+            np.mean(losses),
+        ))
+    
+@fl.task(container_image=image_spec)
+def save_state(model: ConvVAE) -> None:
+    torch.save(model.state_dict(), os.path.join("config",
+                                                "cvae.pth"))
+
+@fl.task(container_image=image_spec)
+def optimize(loss: torch.Tensor, optimizer: torch.optim.Adam) -> None:
+    loss.backward()
+    optimizer.step()
 
 @fl.task(container_image=image_spec)
 def training_loop(model: ConvVAE, optimizer: torch.optim.Adam, criterion: torch.nn.BCELoss, num_epochs: int, training_generator: DataLoader, 
@@ -52,27 +84,29 @@ def training_loop(model: ConvVAE, optimizer: torch.optim.Adam, criterion: torch.
             sample_reshape = pre.reshape_batch(sample_norm)
             sample_c_reshape = pre.reshape_batch(sample_c_norm)
 
-            recon, mu, log_var = model(sample_c_reshape)
-            bce_loss = criterion(recon, sample_reshape)
-            print(type(bce_loss))
-            print(type(mu))
+            recon, mu, log_var = reconstruct_sample(model, sample_c_reshape)
+            bce_loss = compute_bce(criterion, recon, sample_reshape)
             loss = final_loss(bce_loss, mu, log_var)
-            losses.append(loss.item())
-            loss.backward()
-            optimizer.step()
+            append_losses(losses, loss)
+            #losses.append(loss.item())
+            optimize(loss, optimizer)
+            #loss.backward()
+            #optimizer.step()
 
             del sample, sample_c, sample_norm, sample_c_norm, sample_reshape, sample_c_reshape, recon, mu, log_var
             #torch.cuda.empty_cache()
 
+        # This needs to be wrapped in a task
+        #losses.append(loss.detach().cpu().numpy())
+        #print('Finished epoch:{} | Loss : {:.4f}'.format(
+        #        epoch_idx + 1,
+        #        np.mean(losses),
+        #    ))
+        print_loss(losses, loss, epoch_idx)
 
-        losses.append(loss.detach().cpu().numpy())
-        print('Finished epoch:{} | Loss : {:.4f}'.format(
-                epoch_idx + 1,
-                np.mean(losses),
-            ))
-
-        torch.save(model.state_dict(), os.path.join("config",
-                                                "cvae.pth"))
+        #torch.save(model.state_dict(), os.path.join("config",
+        #                                        "cvae.pth"))
+        save_state(model)
 
 
 @fl.workflow
