@@ -110,7 +110,7 @@ def training_loop(model: ConvVAE, optimizer: torch.optim.Adam, criterion: torch.
 
 
 @fl.workflow
-def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 2,
+def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] = 1,
                       percent_corrupt: Annotated[float, typer.Option(min=0, max=0.9)] = 0.3,
                       learning_rate: Annotated[float, typer.Option(min=10e-6, max=10e-2)] = 0.001) -> None:
     _locals = {k: v for k, v in locals().items() if not k.startswith("_")}
@@ -157,6 +157,7 @@ def train_autoencoder(num_epochs: Annotated[int, typer.Option(min=0, max=1000)] 
     criterion = torch.nn.BCELoss(reduction='sum')
 
     training_loop(model, optimizer, criterion, num_epochs, training_generator, percent_corrupt, global_min, global_max)
+
 
 if __name__ == '__main__':
     typer.run(train_autoencoder)
