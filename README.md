@@ -2,7 +2,7 @@
 
 This project implements a training pipeline for a **Convolutional Variational Autoencoder (CVAE)** on gridded geospatial data. The data is ingested using [xbatcher](https://xbatcher.readthedocs.io/) and loaded efficiently into PyTorch via a custom `Dataset` class with support for multi-process loading and lazy evaluation.
 
-## 📌 Features
+## Features
 
 - Efficient batched data loading from large xarray datasets using `xbatcher`
 - Dynamic preprocessing pipeline with:
@@ -16,7 +16,7 @@ This project implements a training pipeline for a **Convolutional Variational Au
 - Optional multi-worker `DataLoader` for speedup
 - Debugging and profiling hooks for memory usage and batch timing
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 project/
@@ -41,7 +41,7 @@ project/
 ```
 
 
-## 🚀 Usage
+## Usage
 
 ### Setup
 
@@ -75,22 +75,22 @@ Adjust num_workers and prefetch_factor in the config to tune performance. Be awa
 * More workers can increase RAM usage
 * Large prefetch factors can lead to memory exhaustion
 
-## 🧠 Troubleshooting & Notes
+## Troubleshooting & Notes
 * ```nvidia-smi``` may show “GPU Off” until a model is transferred to CUDA memory and used.
 * Slow training at first followed by acceleration is typical when DataLoader workers are still warming up and populating their queues.
 * RAM usage may increase over time if tensors or results are held in memory unnecessarily. Monitor for potential memory leaks or caching behavior in multiprocessing contexts.
 
-## ✅ TODO
+## TODO
 * Add early stopping and validation support
 * Save training loss curve to file
 * Add evaluation/inference script
 * Dockerfile for reproducibility
 * Support for multiple variables or channels in training
 
-## 📜 License
+## License
 MIT License. See LICENSE file for details.
 
-## 🙌 Acknowledgments
+## Acknowledgments
 Thanks to the developers of:
 
 * xbatcher
