@@ -57,7 +57,7 @@ project/
 
 Run the training pipeline:
 ```
-python -m src.workflows.train_vae --num-epochs 20
+python -m src.workflows.train_vae --num-epochs 2
 ```
 This will:
 
